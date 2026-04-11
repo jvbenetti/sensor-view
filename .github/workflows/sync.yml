@@ -1,0 +1,26 @@
+name: Sync to Personal Repo
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Push para o repositório pessoal
+        uses: cpina/github-action-push-to-another-repository@main
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+        with:
+          source-directory: '.'
+          destination-github-username: 'jvbenetti'
+          destination-repository-name: 'sensor-view'
+          user-email: 'filipimjoa@gmail.com'
+          target-branch: main
