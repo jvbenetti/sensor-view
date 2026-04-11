@@ -16,13 +16,15 @@ jobs:
 
       - name: Force Push para o repositório pessoal
         run: |
-          # Configura quem está fazendo o push
+          # Configurações do Git (CORRIGIDO: user.name e user.email)
           git config --global user.name 'jvbenetti'
-          git config --global user-email 'filipimjoa@gmail.com'
+          git config --global user.email 'filipimjoa@gmail.com'
           
-          # Adiciona o seu repo pessoal como um alvo usando o Token para autenticar
-          # IMPORTANTE: Mude o nome do Secret se você renomeou no passo acima
-          git remote add target https://${{ secrets.MY_SYNC_TOKEN }}@github.com/jvbenetti/sensor-view.git
+          # Remove o target caso ele já exista de uma execução falha anterior
+          git remote remove target || true
           
-          # Força o envio de tudo da main para a main do seu repo
+          # Adiciona o seu repo pessoal usando o Token
+          git remote add target https://${{ secrets.TOKEN_GITHUB }}@github.com/jvbenetti/sensor-view.git
+          
+          # Força o envio da branch main
           git push target main --force
