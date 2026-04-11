@@ -80,7 +80,7 @@ const SensorApp = () => {
             <h3 style={{ margin: '0 0 10px 0' }}><MapPin size={18} /> Localização Atual</h3>
             <p>Lat: {location.lat || 'Buscando...'}</p>
             <p>Lon: {location.lon || 'Buscando...'}</p>
-            <small>Para ver cidade/estado, você precisaria de uma API como Google Maps.</small>
+            <small>By @jvbenetti</small>
           </div>
 
         </div>
