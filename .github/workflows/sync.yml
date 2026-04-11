@@ -17,7 +17,7 @@ jobs:
       - name: Push para o repositório pessoal
         uses: cpina/github-action-push-to-another-repository@main
         env:
-          API_TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+          API_TOKEN_GITHUB: ${{ secrets.MY_SYNC_TOKEN }}
         with:
           source-directory: '.'
           destination-github-username: 'jvbenetti'
