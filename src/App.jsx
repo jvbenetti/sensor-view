@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 const SensorTest = () => {
   const [data, setData] = useState({ x: 0, y: 0, z: 0 });
   const [isSupported, setIsSupported] = useState(false);
-//
+
   const requestPermission = async () => {
     // Verifica se o navegador exige permissão (iOS)
     if (typeof DeviceMotionEvent.requestPermission === 'function') {
