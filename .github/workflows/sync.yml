@@ -1,30 +1,26 @@
-name: Sync to Personal Repo
+name: Testar Código
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
-  sync:
+  build_test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout do código
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+        uses: actions/checkout@v4
 
-      - name: Force Push para o repositório pessoal
-        run: |
-          # Configurações do Git (CORRIGIDO: user.name e user.email)
-          git config --global user.name 'jvbenetti'
-          git config --global user.email 'filipimjoa@gmail.com'
-          
-          # Remove o target caso ele já exista de uma execução falha anterior
-          git remote remove target || true
-          
-          # Adiciona o seu repo pessoal usando o Token
-          git remote add target https://${{ secrets.TOKEN_GITHUB }}@github.com/jvbenetti/sensor-view.git
-          
-          # Força o envio da branch main
-          git push target main --force
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Instalar dependências
+        run: npm install
+
+      - name: Tentar Build (Verifica erros de sintaxe e tipos)
+        run: npm run build
