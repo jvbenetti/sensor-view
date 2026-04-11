@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import Chart from 'react-apexcharts';
 import { Activity, MapPin, Smartphone, Compass, Battery, Mic, Cpu, FileJson } from 'lucide-react';
 
@@ -13,11 +13,10 @@ const SensorApp = () => {
   
   const [chartData, setChartData] = useState([]);
   const [active, setActive] = useState(false);
-  const audioContextRef = useRef(null);
 
   const requestPermissions = async () => {
     try {
-      // 1. Permissão de Movimento e Orientação (iOS)
+      // 1. Movimento e Orientação (iOS)
       if (typeof DeviceMotionEvent.requestPermission === 'function') {
         const res = await DeviceMotionEvent.requestPermission();
         if (res === 'granted') startHardwareFeatures();
@@ -25,21 +24,20 @@ const SensorApp = () => {
         startHardwareFeatures();
       }
 
-      // 2. Permissão de Localização
+      // 2. Localização
       navigator.geolocation.watchPosition(
         (pos) => setLocation({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
         (err) => console.error(err),
         { enableHighAccuracy: true }
       );
 
-      // 3. Permissão de Microfone (Decibelímetro)
+      // 3. Microfone
       startAudioMonitor();
 
-      // 4. Bateria (Não suportado no Safari/iOS, mas funciona no Android)
+      // 4. Bateria
       if (navigator.getBattery) {
         navigator.getBattery().then(bat => {
           setBattery({ level: (bat.level * 100).toFixed(0), charging: bat.charging });
-          bat.addEventListener('levelchange', () => setBattery(prev => ({ ...prev, level: (bat.level * 100).toFixed(0) })));
         });
       }
 
@@ -51,12 +49,11 @@ const SensorApp = () => {
 
       setActive(true);
     } catch (err) {
-      alert("Erro ao ativar sensores: " + err);
+      alert("Erro ao ativar: " + err);
     }
   };
 
   const startHardwareFeatures = () => {
-    // Acelerômetro
     window.addEventListener('devicemotion', (event) => {
       const x = event.accelerationIncludingGravity.x || 0;
       setAccel({ 
@@ -67,7 +64,6 @@ const SensorApp = () => {
       setChartData(prev => [...prev, x.toFixed(2)].slice(-20));
     });
 
-    // Bússola / Orientação
     window.addEventListener('deviceorientation', (event) => {
       setOrientation({
         alpha: event.alpha?.toFixed(0) || 0,
@@ -84,9 +80,7 @@ const SensorApp = () => {
       const analyser = audioContext.createAnalyser();
       const microphone = audioContext.createMediaStreamSource(stream);
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      
       microphone.connect(analyser);
-      
       const updateVolume = () => {
         analyser.getByteFrequencyData(dataArray);
         let values = 0;
@@ -95,91 +89,136 @@ const SensorApp = () => {
         requestAnimationFrame(updateVolume);
       };
       updateVolume();
-    } catch (err) {
-      console.log("Microfone bloqueado ou não suportado");
-    }
+    } catch (err) { console.log("Som desativado"); }
   };
 
   const exportJSON = () => {
     const data = { accel, orientation, location, battery, sysInfo, timestamp: new Date() };
-    console.log("Relatório do Dispositivo:", data);
-    alert("Relatório gerado no Console do Navegador!");
+    console.log("Relatório:", data);
+    alert("Dados enviados para o console!");
   };
 
   const chartOptions = {
-    chart: { id: 'realtime', animations: { enabled: false }, toolbar: { show: false } },
+    chart: { id: 'realtime', animations: { enabled: false }, toolbar: { show: false }, background: 'transparent' },
     stroke: { curve: 'smooth', width: 3, colors: ['#3b82f6'] },
-    xaxis: { labels: { show: false } },
-    yaxis: { min: -15, max: 15 },
-    grid: { borderColor: '#e7e7e7' }
+    xaxis: { labels: { show: false }, axisBorder: { show: false } },
+    yaxis: { min: -15, max: 15, labels: { style: { colors: '#666' } } },
+    grid: { borderColor: '#333' },
+    theme: { mode: 'dark' }
+  };
+
+  // Estilos rápidos
+  const cardStyle = {
+    background: '#1e1e1e',
+    padding: '15px',
+    borderRadius: '15px',
+    border: '1px solid #333',
+    color: 'white'
   };
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'sans-serif', maxWidth: '600px', margin: 'auto', backgroundColor: '#f9fafb', minHeight: '100vh' }}>
-      <header style={{ textAlign: 'center', marginBottom: '20px' }}>
-        <h1 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', color: '#1f2937' }}>
-          <Activity color="#3b82f6" size={32} /> Sensor Hub Pro
-        </h1>
-        <p style={{ color: '#6b7280' }}>Monitoramento de Hardware em Tempo Real</p>
-      </header>
-
+    <div style={{ 
+      backgroundColor: '#000000', 
+      minHeight: '100vh', 
+      color: 'white', 
+      fontFamily: 'sans-serif',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: !active ? 'center' : 'flex-start',
+      padding: '20px'
+    }}>
+      
       {!active ? (
-        <button 
-          onClick={requestPermissions}
-          style={{ width: '100%', padding: '20px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '12px', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
-        >
-          INICIAR DIAGNÓSTICO COMPLETO
-        </button>
+        <div style={{ textAlign: 'center' }}>
+          <Activity color="#3b82f6" size={60} style={{ marginBottom: '20px' }} />
+          <h1 style={{ marginBottom: '10px' }}>Sensor Hub Pro</h1>
+          <p style={{ color: '#888', marginBottom: '30px' }}>Sistema de Diagnóstico de Hardware</p>
+          <button 
+            onClick={requestPermissions}
+            style={{ 
+              padding: '20px 40px', 
+              background: '#3b82f6', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '50px', 
+              fontSize: '18px', 
+              fontWeight: 'bold', 
+              cursor: 'pointer',
+              boxShadow: '0 0 20px rgba(59, 130, 246, 0.5)'
+            }}
+          >
+            INICIAR SENSORES
+          </button>
+        </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-          
-          {/* Acelerômetro - Ocupa 2 colunas */}
-          <div style={{ gridColumn: 'span 2', background: 'white', padding: '15px', borderRadius: '15px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-            <h3 style={{ margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '8px' }}><Smartphone size={18} /> Movimento (G)</h3>
-            <Chart options={chartOptions} series={[{ name: 'Eixo X', data: chartData }]} type="line" height={120} />
+        <div style={{ width: '100%', maxWidth: '500px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          <header style={{ textAlign: 'center', marginBottom: '10px' }}>
+            <h2 style={{ color: '#3b82f6', margin: 0 }}>SISTEMA ATIVO</h2>
+            <small style={{ color: '#666' }}>Monitorando iPhone 16 Labs</small>
+          </header>
+
+          {/* Gráfico Acelerômetro */}
+          <div style={cardStyle}>
+            <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#3b82f6' }}><Activity size={16} /> MOVIMENTO (EIXO X)</h3>
+            <Chart options={chartOptions} series={[{ data: chartData }]} type="line" height={130} />
           </div>
 
-          {/* Bússola */}
-          <div style={{ background: 'white', padding: '15px', borderRadius: '15px' }}>
-            <h4 style={{ margin: '0', display: 'flex', alignItems: 'center', gap: '5px' }}><Compass size={16} /> Bússola</h4>
-            <p style={{ fontSize: '20px', fontWeight: 'bold', margin: '10px 0' }}>{orientation.alpha}° <small>N</small></p>
+          {/* Grid de Sensores Rápidos */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+            <div style={cardStyle}>
+              <h4 style={{ margin: 0, fontSize: '12px', color: '#888' }}><Compass size={14} /> BÚSSOLA</h4>
+              <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '10px 0' }}>{orientation.alpha}°</p>
+            </div>
+            <div style={cardStyle}>
+              <h4 style={{ margin: 0, fontSize: '12px', color: '#888' }}><Mic size={14} /> RUÍDO</h4>
+              <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '10px 0' }}>{volume}</p>
+            </div>
           </div>
 
-          {/* Som */}
-          <div style={{ background: 'white', padding: '15px', borderRadius: '15px' }}>
-            <h4 style={{ margin: '0', display: 'flex', alignItems: 'center', gap: '5px' }}><Mic size={16} /> Nível de Som</h4>
-            <p style={{ fontSize: '20px', fontWeight: 'bold', margin: '10px 0' }}>{volume} <small>un</small></p>
+          {/* GPS */}
+          <div style={cardStyle}>
+            <h4 style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#888' }}><MapPin size={14} /> LOCALIZAÇÃO GPS</h4>
+            <div style={{ fontSize: '14px', fontFamily: 'monospace' }}>
+              <div>LAT: {location.lat?.toFixed(6) || '---'}</div>
+              <div>LON: {location.lon?.toFixed(6) || '---'}</div>
+            </div>
           </div>
 
-          {/* Localização */}
-          <div style={{ gridColumn: 'span 2', background: 'white', padding: '15px', borderRadius: '15px' }}>
-            <h4 style={{ margin: '0', display: 'flex', alignItems: 'center', gap: '5px' }}><MapPin size={16} /> GPS</h4>
-            <p style={{ fontSize: '14px', margin: '5px 0' }}>Lat: {location.lat?.toFixed(5) || '...'}</p>
-            <p style={{ fontSize: '14px', margin: '5px 0' }}>Lon: {location.lon?.toFixed(5) || '...'}</p>
+          {/* Hardware & Bateria */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+            <div style={cardStyle}>
+              <h4 style={{ margin: 0, fontSize: '12px', color: '#888' }}><Battery size={14} /> BATERIA</h4>
+              <p style={{ fontSize: '16px', marginTop: '10px' }}>{battery.level > 0 ? `${battery.level}%` : "N/A (iOS)"}</p>
+            </div>
+            <div style={cardStyle}>
+              <h4 style={{ margin: 0, fontSize: '12px', color: '#888' }}><Cpu size={14} /> CPU</h4>
+              <p style={{ fontSize: '16px', marginTop: '10px' }}>{sysInfo.cores} Cores</p>
+            </div>
           </div>
 
-          {/* Bateria e Sistema */}
-          <div style={{ background: 'white', padding: '15px', borderRadius: '15px' }}>
-            <h4 style={{ margin: '0', display: 'flex', alignItems: 'center', gap: '5px' }}><Battery size={16} /> Bateria</h4>
-            <p style={{ fontSize: '14px' }}>{battery.level > 0 ? `${battery.level}%` : "N/A (iOS)"}</p>
-          </div>
-
-          <div style={{ background: 'white', padding: '15px', borderRadius: '15px' }}>
-            <h4 style={{ margin: '0', display: 'flex', alignItems: 'center', gap: '5px' }}><Cpu size={16} /> Hardware</h4>
-            <p style={{ fontSize: '12px' }}>Cores: {sysInfo.cores}</p>
-            <p style={{ fontSize: '12px' }}>{sysInfo.resolution}</p>
-          </div>
-
-          {/* Botão Exportar */}
+          {/* Ações */}
           <button 
             onClick={exportJSON}
-            style={{ gridColumn: 'span 2', padding: '12px', background: '#10b981', color: 'white', border: 'none', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', fontWeight: 'bold' }}
+            style={{ 
+              padding: '15px', 
+              background: 'transparent', 
+              color: '#10b981', 
+              border: '1px solid #10b981', 
+              borderRadius: '10px', 
+              fontWeight: 'bold',
+              marginTop: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}
           >
-            <FileJson size={18} /> GERAR RELATÓRIO JSON
+            <FileJson size={18} /> EXPORTAR RELATÓRIO
           </button>
 
-          <footer style={{ gridColumn: 'span 2', textAlign: 'center', fontSize: '12px', color: '#9ca3af', marginTop: '10px' }}>
-            By @jvbenetti | iPhone 16 Labs
+          <footer style={{ textAlign: 'center', fontSize: '10px', color: '#444', marginTop: '20px' }}>
+            PROJETO ACADÊMICO - SEGURANÇA WEB BY @JVBENETTI
           </footer>
         </div>
       )}
