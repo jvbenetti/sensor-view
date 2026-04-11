@@ -22,7 +22,7 @@ jobs:
           
           # Adiciona o seu repo pessoal como um alvo usando o Token para autenticar
           # IMPORTANTE: Mude o nome do Secret se você renomeou no passo acima
-          git remote add target https://${{ secrets.TOKEN_GITHUB }}@github.com/jvbenetti/sensor-view.git
+          git remote add target https://${{ secrets.MY_SYNC_TOKEN }}@github.com/jvbenetti/sensor-view.git
           
           # Força o envio de tudo da main para a main do seu repo
           git push target main --force
