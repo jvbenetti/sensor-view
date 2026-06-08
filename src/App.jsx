@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import Chart from 'react-apexcharts';
-import { Activity, MapPin, Smartphone, Compass, Battery, Mic, Cpu, FileJson } from 'lucide-react';
+import { Activity, MapPin, Compass, Battery, Mic, Cpu, FileJson, Thermometer, Droplets } from 'lucide-react';
 
 const SensorApp = () => {
   // Estados dos Sensores
@@ -11,12 +11,15 @@ const SensorApp = () => {
   const [volume, setVolume] = useState(0);
   const [sysInfo, setSysInfo] = useState({ cores: 0, resolution: "" });
   
+  // NOVO: Estado para o Clima (Temperatura e Umidade)
+  const [weather, setWeather] = useState({ temp: null, humidity: null });
+  
   const [chartData, setChartData] = useState([]);
   const [active, setActive] = useState(false);
 
   const requestPermissions = async () => {
     try {
-      // 1. Movimento e Orientação (iOS)
+      // 1. Movimento e Orientação (iOS exige permissão)
       if (typeof DeviceMotionEvent.requestPermission === 'function') {
         const res = await DeviceMotionEvent.requestPermission();
         if (res === 'granted') startHardwareFeatures();
@@ -24,24 +27,42 @@ const SensorApp = () => {
         startHardwareFeatures();
       }
 
-      // 2. Localização
+      // 2. Localização contínua
       navigator.geolocation.watchPosition(
         (pos) => setLocation({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
         (err) => console.error(err),
         { enableHighAccuracy: true }
       );
 
-      // 3. Microfone
+      // 3. NOVO: Buscar Clima (Dispara apenas uma vez pegando a posição atual)
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        try {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m`);
+          const data = await response.json();
+          if (data.current) {
+            setWeather({
+              temp: data.current.temperature_2m,
+              humidity: data.current.relative_humidity_2m
+            });
+          }
+        } catch (error) {
+          console.error("Erro ao buscar clima via API", error);
+        }
+      });
+
+      // 4. Microfone
       startAudioMonitor();
 
-      // 4. Bateria
+      // 5. Bateria
       if (navigator.getBattery) {
         navigator.getBattery().then(bat => {
           setBattery({ level: (bat.level * 100).toFixed(0), charging: bat.charging });
         });
       }
 
-      // 5. Info do Sistema
+      // 6. Info do Sistema
       setSysInfo({
         cores: navigator.hardwareConcurrency || "N/A",
         resolution: `${window.screen.width}x${window.screen.height}`
@@ -49,7 +70,7 @@ const SensorApp = () => {
 
       setActive(true);
     } catch (err) {
-      alert("Erro ao ativar: " + err);
+      alert("Erro ao ativar sensores: " + err);
     }
   };
 
@@ -93,8 +114,9 @@ const SensorApp = () => {
   };
 
   const exportJSON = () => {
-    const data = { accel, orientation, location, battery, sysInfo, timestamp: new Date() };
-    console.log("Relatório:", data);
+    // Adicionamos o clima ao relatório exportado
+    const data = { accel, orientation, location, weather, battery, sysInfo, timestamp: new Date() };
+    console.log("Relatório Completo:", JSON.stringify(data, null, 2));
     alert("Dados enviados para o console!");
   };
 
@@ -107,7 +129,6 @@ const SensorApp = () => {
     theme: { mode: 'dark' }
   };
 
-  // Estilos rápidos
   const cardStyle = {
     background: '#1e1e1e',
     padding: '15px',
@@ -155,13 +176,29 @@ const SensorApp = () => {
         <div style={{ width: '100%', maxWidth: '500px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
           <header style={{ textAlign: 'center', marginBottom: '10px' }}>
             <h2 style={{ color: '#3b82f6', margin: 0 }}>SISTEMA ATIVO</h2>
-            <small style={{ color: '#666' }}>Monitorando iPhone 16 Labs</small>
+            <small style={{ color: '#666' }}>Monitorando Dispositivo via Web</small>
           </header>
 
           {/* Gráfico Acelerômetro */}
           <div style={cardStyle}>
             <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#3b82f6' }}><Activity size={16} /> MOVIMENTO (EIXO X)</h3>
             <Chart options={chartOptions} series={[{ data: chartData }]} type="line" height={130} />
+          </div>
+
+          {/* NOVO: Grid de Clima */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+            <div style={cardStyle}>
+              <h4 style={{ margin: 0, fontSize: '12px', color: '#888' }}><Thermometer size={14} /> TEMP. AMBIENTE</h4>
+              <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '10px 0' }}>
+                {weather.temp ? `${weather.temp}°C` : 'Buscando...'}
+              </p>
+            </div>
+            <div style={cardStyle}>
+              <h4 style={{ margin: 0, fontSize: '12px', color: '#888' }}><Droplets size={14} /> UMIDADE</h4>
+              <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '10px 0' }}>
+                {weather.humidity ? `${weather.humidity}%` : 'Buscando...'}
+              </p>
+            </div>
           </div>
 
           {/* Grid de Sensores Rápidos */}
@@ -211,7 +248,8 @@ const SensorApp = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '8px'
+              gap: '8px',
+              cursor: 'pointer'
             }}
           >
             <FileJson size={18} /> EXPORTAR RELATÓRIO
