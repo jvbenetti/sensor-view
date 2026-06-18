@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Chart from 'react-apexcharts';
-import { Activity, MapPin, Compass, Battery, Mic, Cpu, FileJson, Thermometer, Droplets } from 'lucide-react';
+import { Activity, MapPin, Compass, Battery, Mic, Cpu, FileJson, Thermometer, Droplets, Download } from 'lucide-react';
 
 const SensorApp = () => {
   // Estados dos Sensores
@@ -11,7 +11,7 @@ const SensorApp = () => {
   const [volume, setVolume] = useState(0);
   const [sysInfo, setSysInfo] = useState({ cores: 0, resolution: "" });
   
-  // NOVO: Estado para o Clima (Temperatura e Umidade)
+  // Estado para o Clima (Temperatura e Umidade)
   const [weather, setWeather] = useState({ temp: null, humidity: null });
   
   const [chartData, setChartData] = useState([]);
@@ -34,7 +34,7 @@ const SensorApp = () => {
         { enableHighAccuracy: true }
       );
 
-      // 3. NOVO: Buscar Clima (Dispara apenas uma vez pegando a posição atual)
+      // 3. Buscar Clima (Dispara apenas uma vez pegando a posição atual)
       navigator.geolocation.getCurrentPosition(async (pos) => {
         try {
           const lat = pos.coords.latitude;
@@ -114,10 +114,43 @@ const SensorApp = () => {
   };
 
   const exportJSON = () => {
-    // Adicionamos o clima ao relatório exportado
     const data = { accel, orientation, location, weather, battery, sysInfo, timestamp: new Date() };
     console.log("Relatório Completo:", JSON.stringify(data, null, 2));
     alert("Dados enviados para o console!");
+  };
+
+  // NOVO: Função para exportar e baixar arquivo .CSV
+  const exportCSV = () => {
+    // 1. Definir os cabeçalhos das colunas
+    const headers = [
+      "Timestamp", "Accel_X", "Accel_Y", "Accel_Z", 
+      "Orient_Alpha", "Orient_Beta", "Orient_Gamma", 
+      "Latitude", "Longitude", "Temperatura_C", "Umidade_%", 
+      "Bateria_%", "Ruido_Audio", "CPU_Cores", "Resolucao"
+    ];
+
+    // 2. Mapear os valores do estado atual
+    const row = [
+      new Date().toISOString(),
+      accel.x, accel.y, accel.z,
+      orientation.alpha, orientation.beta, orientation.gamma,
+      location.lat || "N/A", location.lon || "N/A",
+      weather.temp || "N/A", weather.humidity || "N/A",
+      battery.level, volume, sysInfo.cores, sysInfo.resolution
+    ];
+
+    // 3. Juntar cabeçalhos e valores separados por vírgula
+    const csvContent = headers.join(",") + "\n" + row.join(",");
+
+    // 4. Criar o arquivo e forçar o download no navegador
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `diagnostico_sensores_${new Date().getTime()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const chartOptions = {
@@ -135,6 +168,19 @@ const SensorApp = () => {
     borderRadius: '15px',
     border: '1px solid #333',
     color: 'white'
+  };
+
+  const buttonStyle = {
+    padding: '15px', 
+    background: 'transparent', 
+    borderRadius: '10px', 
+    fontWeight: 'bold',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    cursor: 'pointer',
+    flex: 1
   };
 
   return (
@@ -185,7 +231,7 @@ const SensorApp = () => {
             <Chart options={chartOptions} series={[{ data: chartData }]} type="line" height={130} />
           </div>
 
-          {/* NOVO: Grid de Clima */}
+          {/* Grid de Clima */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
             <div style={cardStyle}>
               <h4 style={{ margin: 0, fontSize: '12px', color: '#888' }}><Thermometer size={14} /> TEMP. AMBIENTE</h4>
@@ -234,26 +280,22 @@ const SensorApp = () => {
             </div>
           </div>
 
-          {/* Ações */}
-          <button 
-            onClick={exportJSON}
-            style={{ 
-              padding: '15px', 
-              background: 'transparent', 
-              color: '#10b981', 
-              border: '1px solid #10b981', 
-              borderRadius: '10px', 
-              fontWeight: 'bold',
-              marginTop: '10px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              cursor: 'pointer'
-            }}
-          >
-            <FileJson size={18} /> EXPORTAR RELATÓRIO
-          </button>
+          {/* NOVO: Ações em Grid (Botões Lado a Lado) */}
+          <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+            <button 
+              onClick={exportJSON}
+              style={{ ...buttonStyle, color: '#10b981', border: '1px solid #10b981' }}
+            >
+              <FileJson size={18} /> JSON
+            </button>
+            
+            <button 
+              onClick={exportCSV}
+              style={{ ...buttonStyle, color: '#f59e0b', border: '1px solid #f59e0b' }}
+            >
+              <Download size={18} /> CSV
+            </button>
+          </div>
 
           <footer style={{ textAlign: 'center', fontSize: '10px', color: '#444', marginTop: '20px' }}>
             PROJETO ACADÊMICO - SEGURANÇA WEB BY @JVBENETTI
