@@ -1,25 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Chart from 'react-apexcharts';
 import { Activity, MapPin, Compass, Battery, Mic, Cpu, FileJson, Thermometer, Droplets, Download } from 'lucide-react';
 
 const SensorApp = () => {
-  // Estados dos Sensores
   const [accel, setAccel] = useState({ x: 0, y: 0, z: 0 });
   const [orientation, setOrientation] = useState({ alpha: 0, beta: 0, gamma: 0 });
   const [location, setLocation] = useState({ lat: null, lon: null });
   const [battery, setBattery] = useState({ level: 0, charging: false });
   const [volume, setVolume] = useState(0);
   const [sysInfo, setSysInfo] = useState({ cores: 0, resolution: "" });
-  
-  // Estado para o Clima (Temperatura e Umidade)
   const [weather, setWeather] = useState({ temp: null, humidity: null });
   
   const [chartData, setChartData] = useState([]);
   const [active, setActive] = useState(false);
 
+  // NOVO: Estados e Refs para o Histórico de 20 segundos
+  const [history, setHistory] = useState([]);
+  const latestDataRef = useRef();
+
+  // NOVO: Mantém a referência sempre atualizada com os dados mais recentes dos sensores
+  useEffect(() => {
+    latestDataRef.current = { accel, orientation, location, weather, battery, volume, sysInfo };
+  }, [accel, orientation, location, weather, battery, volume, sysInfo]);
+
+  // NOVO: Salva um "snapshot" a cada 1 segundo, mantendo apenas os últimos 20
+  useEffect(() => {
+    let interval;
+    if (active) {
+      interval = setInterval(() => {
+        if (latestDataRef.current) {
+          setHistory(prev => {
+            const newRecord = { timestamp: new Date().toISOString(), ...latestDataRef.current };
+            // Adiciona o novo e corta o array para manter no máximo 20 itens (20 segundos)
+            return [...prev, newRecord].slice(-20);
+          });
+        }
+      }, 1000); // 1000 ms = 1 segundo
+    }
+    return () => clearInterval(interval);
+  }, [active]);
+
   const requestPermissions = async () => {
     try {
-      // 1. Movimento e Orientação (iOS exige permissão)
       if (typeof DeviceMotionEvent.requestPermission === 'function') {
         const res = await DeviceMotionEvent.requestPermission();
         if (res === 'granted') startHardwareFeatures();
@@ -27,14 +49,12 @@ const SensorApp = () => {
         startHardwareFeatures();
       }
 
-      // 2. Localização contínua
       navigator.geolocation.watchPosition(
         (pos) => setLocation({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
         (err) => console.error(err),
         { enableHighAccuracy: true }
       );
 
-      // 3. Buscar Clima (Dispara apenas uma vez pegando a posição atual)
       navigator.geolocation.getCurrentPosition(async (pos) => {
         try {
           const lat = pos.coords.latitude;
@@ -42,27 +62,19 @@ const SensorApp = () => {
           const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m`);
           const data = await response.json();
           if (data.current) {
-            setWeather({
-              temp: data.current.temperature_2m,
-              humidity: data.current.relative_humidity_2m
-            });
+            setWeather({ temp: data.current.temperature_2m, humidity: data.current.relative_humidity_2m });
           }
-        } catch (error) {
-          console.error("Erro ao buscar clima via API", error);
-        }
+        } catch (error) { console.error("Erro ao buscar clima via API", error); }
       });
 
-      // 4. Microfone
       startAudioMonitor();
 
-      // 5. Bateria
       if (navigator.getBattery) {
         navigator.getBattery().then(bat => {
           setBattery({ level: (bat.level * 100).toFixed(0), charging: bat.charging });
         });
       }
 
-      // 6. Info do Sistema
       setSysInfo({
         cores: navigator.hardwareConcurrency || "N/A",
         resolution: `${window.screen.width}x${window.screen.height}`
@@ -78,9 +90,9 @@ const SensorApp = () => {
     window.addEventListener('devicemotion', (event) => {
       const x = event.accelerationIncludingGravity.x || 0;
       setAccel({ 
-        x, 
-        y: event.accelerationIncludingGravity.y || 0, 
-        z: event.accelerationIncludingGravity.z || 0 
+        x: x.toFixed(2), 
+        y: (event.accelerationIncludingGravity.y || 0).toFixed(2), 
+        z: (event.accelerationIncludingGravity.z || 0).toFixed(2) 
       });
       setChartData(prev => [...prev, x.toFixed(2)].slice(-20));
     });
@@ -114,14 +126,18 @@ const SensorApp = () => {
   };
 
   const exportJSON = () => {
-    const data = { accel, orientation, location, weather, battery, sysInfo, timestamp: new Date() };
-    console.log("Relatório Completo:", JSON.stringify(data, null, 2));
-    alert("Dados enviados para o console!");
+    // Exporta todo o histórico para JSON também
+    console.log(`Relatório de Histórico (${history.length} seg):`, JSON.stringify(history, null, 2));
+    alert("Histórico enviado para o console!");
   };
 
-  // NOVO: Função para exportar e baixar arquivo .CSV
+  // NOVO: Função exportCSV refeita para iterar sobre o Histórico
   const exportCSV = () => {
-    // 1. Definir os cabeçalhos das colunas
+    if (history.length === 0) {
+      alert("Aguarde alguns segundos para coletar dados no histórico...");
+      return;
+    }
+
     const headers = [
       "Timestamp", "Accel_X", "Accel_Y", "Accel_Z", 
       "Orient_Alpha", "Orient_Beta", "Orient_Gamma", 
@@ -129,25 +145,23 @@ const SensorApp = () => {
       "Bateria_%", "Ruido_Audio", "CPU_Cores", "Resolucao"
     ];
 
-    // 2. Mapear os valores do estado atual
-    const row = [
-      new Date().toISOString(),
-      accel.x, accel.y, accel.z,
-      orientation.alpha, orientation.beta, orientation.gamma,
-      location.lat || "N/A", location.lon || "N/A",
-      weather.temp || "N/A", weather.humidity || "N/A",
-      battery.level, volume, sysInfo.cores, sysInfo.resolution
-    ];
+    // Mapeia todas as linhas armazenadas nos últimos X segundos
+    const rows = history.map(row => [
+      row.timestamp,
+      row.accel.x, row.accel.y, row.accel.z,
+      row.orientation.alpha, row.orientation.beta, row.orientation.gamma,
+      row.location.lat || "N/A", row.location.lon || "N/A",
+      row.weather.temp || "N/A", row.weather.humidity || "N/A",
+      row.battery.level, row.volume, row.sysInfo.cores, row.sysInfo.resolution
+    ].join(","));
 
-    // 3. Juntar cabeçalhos e valores separados por vírgula
-    const csvContent = headers.join(",") + "\n" + row.join(",");
+    const csvContent = headers.join(",") + "\n" + rows.join("\n");
 
-    // 4. Criar o arquivo e forçar o download no navegador
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `diagnostico_sensores_${new Date().getTime()}.csv`);
+    link.setAttribute("download", `historico_sensores_20s_${new Date().getTime()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -163,37 +177,18 @@ const SensorApp = () => {
   };
 
   const cardStyle = {
-    background: '#1e1e1e',
-    padding: '15px',
-    borderRadius: '15px',
-    border: '1px solid #333',
-    color: 'white'
+    background: '#1e1e1e', padding: '15px', borderRadius: '15px', border: '1px solid #333', color: 'white'
   };
 
   const buttonStyle = {
-    padding: '15px', 
-    background: 'transparent', 
-    borderRadius: '10px', 
-    fontWeight: 'bold',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '8px',
-    cursor: 'pointer',
-    flex: 1
+    padding: '15px', background: 'transparent', borderRadius: '10px', fontWeight: 'bold', display: 'flex',
+    alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', flex: 1
   };
 
   return (
     <div style={{ 
-      backgroundColor: '#000000', 
-      minHeight: '100vh', 
-      color: 'white', 
-      fontFamily: 'sans-serif',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: !active ? 'center' : 'flex-start',
-      padding: '20px'
+      backgroundColor: '#000000', minHeight: '100vh', color: 'white', fontFamily: 'sans-serif',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: !active ? 'center' : 'flex-start', padding: '20px'
     }}>
       
       {!active ? (
@@ -204,14 +199,8 @@ const SensorApp = () => {
           <button 
             onClick={requestPermissions}
             style={{ 
-              padding: '20px 40px', 
-              background: '#3b82f6', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '50px', 
-              fontSize: '18px', 
-              fontWeight: 'bold', 
-              cursor: 'pointer',
+              padding: '20px 40px', background: '#3b82f6', color: 'white', border: 'none', 
+              borderRadius: '50px', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer',
               boxShadow: '0 0 20px rgba(59, 130, 246, 0.5)'
             }}
           >
@@ -225,13 +214,11 @@ const SensorApp = () => {
             <small style={{ color: '#666' }}>Monitorando Dispositivo via Web</small>
           </header>
 
-          {/* Gráfico Acelerômetro */}
           <div style={cardStyle}>
             <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#3b82f6' }}><Activity size={16} /> MOVIMENTO (EIXO X)</h3>
             <Chart options={chartOptions} series={[{ data: chartData }]} type="line" height={130} />
           </div>
 
-          {/* Grid de Clima */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
             <div style={cardStyle}>
               <h4 style={{ margin: 0, fontSize: '12px', color: '#888' }}><Thermometer size={14} /> TEMP. AMBIENTE</h4>
@@ -247,7 +234,6 @@ const SensorApp = () => {
             </div>
           </div>
 
-          {/* Grid de Sensores Rápidos */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
             <div style={cardStyle}>
               <h4 style={{ margin: 0, fontSize: '12px', color: '#888' }}><Compass size={14} /> BÚSSOLA</h4>
@@ -259,7 +245,6 @@ const SensorApp = () => {
             </div>
           </div>
 
-          {/* GPS */}
           <div style={cardStyle}>
             <h4 style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#888' }}><MapPin size={14} /> LOCALIZAÇÃO GPS</h4>
             <div style={{ fontSize: '14px', fontFamily: 'monospace' }}>
@@ -268,7 +253,6 @@ const SensorApp = () => {
             </div>
           </div>
 
-          {/* Hardware & Bateria */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
             <div style={cardStyle}>
               <h4 style={{ margin: 0, fontSize: '12px', color: '#888' }}><Battery size={14} /> BATERIA</h4>
@@ -280,20 +264,19 @@ const SensorApp = () => {
             </div>
           </div>
 
-          {/* NOVO: Ações em Grid (Botões Lado a Lado) */}
           <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
             <button 
               onClick={exportJSON}
               style={{ ...buttonStyle, color: '#10b981', border: '1px solid #10b981' }}
             >
-              <FileJson size={18} /> JSON
+              <FileJson size={18} /> JSON ({history.length}s)
             </button>
             
             <button 
               onClick={exportCSV}
               style={{ ...buttonStyle, color: '#f59e0b', border: '1px solid #f59e0b' }}
             >
-              <Download size={18} /> CSV
+              <Download size={18} /> CSV ({history.length}s)
             </button>
           </div>
 
