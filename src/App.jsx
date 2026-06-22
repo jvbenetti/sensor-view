@@ -211,7 +211,7 @@ const SensorApp = () => {
         <div style={{ width: '100%', maxWidth: '500px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
           <header style={{ textAlign: 'center', marginBottom: '10px' }}>
             <h2 style={{ color: '#3b82f6', margin: 0 }}>SISTEMA ATIVO</h2>
-            <small style={{ color: '#666' }}>Monitorando Dispositivo via Web - By SEGURANÇA WEB BY @JVBENETTI</small>
+            <small style={{ color: '#666' }}>Monitorando Dispositivo via Web - SEGURANÇA WEB BY @JVBENETTI</small>
           </header>
 
           <div style={cardStyle}>
